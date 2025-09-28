@@ -3,126 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live GPS Tracker</title>
+    <title>Driver Mode - Live GPS Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        #map { height: 100vh; width: 100vw; z-index: 10; }
         .hidden { display: none; }
     </style>
 </head>
 <body class="bg-gray-100">
 
-    <!-- Role Selection Screen -->
-    <div id="role-selection" class="flex flex-col items-center justify-center min-h-screen">
-        <div class="text-center p-8 bg-white rounded-2xl shadow-lg">
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">Live GPS Tracker</h1>
-            <p class="text-gray-600 mb-8">Please select your role:</p>
-            <div class="space-y-4">
-                <button id="driver-btn" class="w-full max-w-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">I am the Driver</button>
-                <button id="parent-btn" class="w-full max-w-xs bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition">I am the Parent / Tracker</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Driver View -->
-    <div id="driver-view" class="hidden bg-gray-800 text-white flex items-center justify-center min-h-screen">
+    <div id="driver-view" class="bg-gray-800 text-white flex items-center justify-center min-h-screen p-4">
         <div class="w-full max-w-sm bg-gray-900 rounded-2xl shadow-xl p-8 text-center">
-            <h1 class="text-3xl font-bold text-yellow-400 mb-2">Driver Mode</h1>
-            <p class="text-gray-400 mb-6">Bus ID: BUS-42</p>
-            <div class="bg-gray-700 rounded-lg p-4 mb-6">
-                <p class="text-sm font-semibold text-gray-300">STATUS</p>
-                <p id="driver-status" class="text-xl font-bold text-gray-300">Ready</p>
+            <h1 class="text-3xl font-bold text-yellow-400 mb-6">Driver Mode</h1>
+            
+            <!-- Bus ID Section -->
+            <div class="mb-6">
+                <label for="bus-id-input" class="block text-sm font-semibold text-gray-300 mb-2">Enter Your Bus ID</label>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="bus-id-input" class="w-full bg-gray-700 text-white rounded-lg p-3 text-center focus:outline-none focus:ring-2 focus:ring-yellow-400" placeholder="e.g., BUS-123">
+                    <button id="save-bus-id-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition">Save</button>
+                </div>
+                 <button id="clear-bus-id-btn" class="hidden mt-2 text-xs text-red-400 hover:text-red-300 underline">Change ID</button>
             </div>
-            <div class="space-y-4">
-                <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500">Start Broadcasting</button>
-                <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500" disabled>End Trip</button>
+
+            <!-- Status and Controls -->
+            <div id="controls-section" class="hidden">
+                 <p class="text-gray-400 mb-4">Tracking ID: <strong id="display-bus-id" class="text-yellow-400"></strong></p>
+                <div class="bg-gray-700 rounded-lg p-4 mb-6">
+                    <p class="text-sm font-semibold text-gray-300">STATUS</p>
+                    <p id="driver-status" class="text-xl font-bold text-gray-300">Ready</p>
+                </div>
+                <div class="space-y-4">
+                    <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500">Start Broadcasting</button>
+                    <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500" disabled>End Trip</button>
+                </div>
+                 <button id="rules-btn" class="mt-6 text-sm text-blue-400 hover:text-blue-300 underline">View Rules</button>
             </div>
+            
+            <p id="error-message" class="text-red-400 mt-4 text-sm h-4"></p>
         </div>
     </div>
 
-    <!-- Parent/Tracker View -->
-    <div id="parent-view" class="hidden">
-        <div id="map"></div>
-        <div class="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-11/12 max-w-sm">
-            <div class="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
-                <div class="flex items-center justify-between">
-                    <h1 class="text-lg font-bold text-gray-800">Live Bus Tracker</h1>
-                    <div class="flex items-center space-x-2">
-                        <span id="parent-status-indicator" class="h-3 w-3 rounded-full bg-gray-400"></span>
-                        <span id="parent-status-text" class="text-sm font-semibold text-gray-600">Connecting...</span>
-                    </div>
-                </div>
-            </div>
+    <!-- Rules Modal -->
+    <div id="rules-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-800 text-white rounded-2xl shadow-xl p-8 max-w-sm w-full">
+            <h2 class="text-2xl font-bold text-yellow-400 mb-4 text-center">Driver Rules</h2>
+            <ul class="space-y-3 text-gray-300 text-left list-disc list-inside">
+                <li>Enter your assigned Bus ID and press 'Save'.</li>
+                <li>Press <strong>'Start Broadcasting'</strong> at the beginning of your trip.</li>
+                <li>Press <strong>'End Trip'</strong> only when the trip is fully completed.</li>
+                <li>Keep this page open in your browser during the entire trip.</li>
+                <li>Ensure your phone's GPS/Location is turned on and permission is granted.</li>
+            </ul>
+            <button id="close-rules-btn" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded-lg transition">Got It</button>
         </div>
     </div>
+
 
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ============== PASTE YOUR FIREBASE CONFIG HERE ==============
         const firebaseConfig = {
-            apiKey: "AIzaSyAySXFbhyajAE7qcSyjGRcbF8jejG2GAFw",
-            authDomain: "appify-3b358.firebaseapp.com",
-            projectId: "appify-3b358",
-            storageBucket: "appify-3b358.appspot.com",
-            messagingSenderId: "1040554600495",
-            appId: "1:1040554600495:web:71afd390d47d562a333eda",
-            measurementId: "G-4WH3BW00XN"
+          apiKey: "AIzaSyCISwXAdb9w44Wsa2caXbP9XPyQ3U-Yhl4",
+          authDomain: "new-gps-bus.firebaseapp.com",
+          projectId: "new-gps-bus",
+          storageBucket: "new-gps-bus.firebasestorage.app",
+          messagingSenderId: "993768802913",
+          appId: "1:993768802913:web:5420a64038b6682b273820",
+          measurementId: "G-06RLW2QNT6"
         };
         // =============================================================
 
         // --- Global Variables ---
-        const busId = "BUS-42";
+        let busId = null;
         let db, auth;
         let watchId = null;
-        let map = null;
-        let busMarker = null;
 
         // --- UI Elements ---
-        const roleSelectionView = document.getElementById('role-selection');
-        const driverView = document.getElementById('driver-view');
-        const parentView = document.getElementById('parent-view');
-        
-        // --- App Initialization ---
-        try {
-            const app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-            await signInAnonymously(auth);
-            console.log("Firebase Authenticated Anonymously.");
-        } catch (error) {
-            console.error("CRITICAL: Firebase Init or Auth Failed!", error);
-            alert("Could not connect to the service. Please check the console for errors.");
-        }
-
-        // --- Role Selection Logic ---
-        document.getElementById('driver-btn').addEventListener('click', () => {
-            roleSelectionView.classList.add('hidden');
-            driverView.classList.remove('hidden');
-            document.getElementById('start-btn').disabled = false;
-        });
-
-        document.getElementById('parent-btn').addEventListener('click', () => {
-            roleSelectionView.classList.add('hidden');
-            parentView.classList.remove('hidden');
-            initializeParentView();
-        });
-
-        // --- Driver Logic ---
         const driverStatus = document.getElementById('driver-status');
         const startBtn = document.getElementById('start-btn');
         const endBtn = document.getElementById('end-btn');
+        const errorMessage = document.getElementById('error-message');
+        const rulesBtn = document.getElementById('rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const closeRulesBtn = document.getElementById('close-rules-btn');
+        const busIdInput = document.getElementById('bus-id-input');
+        const saveBusIdBtn = document.getElementById('save-bus-id-btn');
+        const clearBusIdBtn = document.getElementById('clear-bus-id-btn');
+        const controlsSection = document.getElementById('controls-section');
+        const displayBusId = document.getElementById('display-bus-id');
+
+        // --- App Initialization ---
+        async function initializeDriverApp() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                await signInAnonymously(auth);
+                console.log("Firebase Authenticated Anonymously.");
+                
+                // Check for saved Bus ID
+                const savedBusId = localStorage.getItem('busId');
+                if (savedBusId) {
+                    busId = savedBusId;
+                    busIdInput.value = busId;
+                    showControls();
+                }
+
+            } catch (error) {
+                console.error("CRITICAL: Firebase Init or Auth Failed!", error);
+                errorMessage.textContent = "Could not connect to the service.";
+            }
+        }
+        
+        function showControls() {
+            busIdInput.disabled = true;
+            saveBusIdBtn.classList.add('hidden');
+            clearBusIdBtn.classList.remove('hidden');
+            controlsSection.classList.remove('hidden');
+            displayBusId.textContent = busId;
+            errorMessage.textContent = '';
+        }
+
+        function hideControls() {
+            busIdInput.disabled = false;
+            busIdInput.value = '';
+            saveBusIdBtn.classList.remove('hidden');
+            clearBusIdBtn.classList.add('hidden');
+            controlsSection.classList.add('hidden');
+            localStorage.removeItem('busId');
+            busId = null;
+        }
+
+        // --- Event Listeners ---
+        saveBusIdBtn.addEventListener('click', () => {
+            const enteredId = busIdInput.value.trim().toUpperCase();
+            if (enteredId) {
+                busId = enteredId;
+                localStorage.setItem('busId', busId);
+                showControls();
+            } else {
+                errorMessage.textContent = 'Please enter a valid Bus ID.';
+            }
+        });
+
+        clearBusIdBtn.addEventListener('click', () => {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                driverStatus.textContent = 'Ready';
+                startBtn.disabled = false;
+                endBtn.disabled = true;
+            }
+            hideControls();
+        });
+
 
         startBtn.addEventListener('click', () => {
             if (!navigator.geolocation) {
-                driverStatus.textContent = 'Geolocation not supported';
+                errorMessage.textContent = 'Geolocation not supported by your browser.';
                 return;
             }
             const options = { enableHighAccuracy: true };
@@ -141,15 +186,18 @@
             startBtn.disabled = false;
             endBtn.disabled = true;
             try {
-                await setDoc(doc(db, "buses", busId), { status: 'offline' }, { merge: true });
+                await setDoc(doc(db, "buses", busId), { status: 'offline', lastUpdate: serverTimestamp() }, { merge: true });
+                console.log("Trip status set to offline.");
             } catch (error) {
                 console.error("Error ending trip:", error);
+                errorMessage.textContent = "Failed to update trip status.";
             }
         });
 
         async function updateLocationInFirestore(position) {
             const { latitude, longitude } = position.coords;
             driverStatus.textContent = 'Broadcasting...';
+            errorMessage.textContent = ""; // Clear previous errors
             try {
                 const busRef = doc(db, "buses", busId);
                 await setDoc(busRef, {
@@ -157,69 +205,40 @@
                     lng: longitude,
                     status: 'en-route',
                     lastUpdate: serverTimestamp()
-                });
+                }, { merge: true });
                 console.log("Location updated:", { latitude, longitude });
             } catch (error) {
                 console.error("Firestore Write Error:", error);
-                driverStatus.textContent = 'Firestore Update Failed';
+                driverStatus.textContent = 'Update Failed';
+                errorMessage.textContent = "Could not send location data.";
             }
         }
 
         function handleLocationError(error) {
             console.error("Geolocation Error:", error.message);
             driverStatus.textContent = 'Location Error';
-        }
-
-        // --- Parent/Tracker Logic ---
-        function initializeParentView() {
-            if (map) return; // Initialize only once
-
-            map = L.map('map').setView([26.1445, 91.7362], 13); // Default view (Guwahati, Assam)
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            
-            listenForBusLocation();
-        }
-
-        function listenForBusLocation() {
-            const busRef = doc(db, "buses", busId);
-            onSnapshot(busRef, (doc) => {
-                const statusIndicator = document.getElementById('parent-status-indicator');
-                const statusText = document.getElementById('parent-status-text');
-
-                if (doc.exists()) {
-                    const data = doc.data();
-                    
-                    // Update status text and indicator
-                    statusIndicator.className = 'h-3 w-3 rounded-full';
-                    if (data.status === 'en-route') {
-                        statusText.textContent = 'En Route';
-                        statusIndicator.classList.add('bg-green-500', 'animate-pulse');
-                    } else {
-                        statusText.textContent = 'Offline';
-                        statusIndicator.classList.add('bg-red-500');
-                    }
-
-                    // Update map marker
-                    if (data.status === 'en-route' && data.lat && data.lng) {
-                        const newPosition = [data.lat, data.lng];
-                        const busIcon = L.icon({
-                            iconUrl: 'https://placehold.co/40x40/facc15/000000?text=BUS&font=inter',
-                            iconSize: [40, 40], iconAnchor: [20, 20],
-                        });
-                        if (!busMarker) {
-                            busMarker = L.marker(newPosition, { icon: busIcon }).addTo(map);
-                            map.setView(newPosition, 16);
-                        } else {
-                            busMarker.setLatLng(newPosition);
-                            map.panTo(newPosition);
-                        }
-                    }
-                } else {
-                    statusText.textContent = 'Waiting for data';
-                    statusIndicator.className = 'h-3 w-3 rounded-full bg-gray-400';
+            errorMessage.textContent = `Geolocation error: ${error.message}`;
+            if(error.code === 1) { // PERMISSION_DENIED
+                 if (watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
                 }
-            });
+                startBtn.disabled = true;
+                endBtn.disabled = true;
+            }
         }
+        
+        rulesBtn.addEventListener('click', () => {
+            rulesModal.classList.remove('hidden');
+        });
+
+        closeRulesBtn.addEventListener('click', () => {
+            rulesModal.classList.add('hidden');
+        });
+
+        // --- Start the app ---
+        initializeDriverApp();
+
     </script>
 </body>
 </html>
