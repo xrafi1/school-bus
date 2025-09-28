@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Driver GPS Broadcaster</title>
+    <title>Driver GPS Broadcaster (Debug)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
+    <style> body { font-family: 'Inter', sans-serif; } </style>
 </head>
 <body class="bg-gray-800 text-white flex items-center justify-center min-h-screen">
 
@@ -22,25 +20,26 @@
         </div>
 
         <div class="space-y-4">
-            <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed">
+            <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed">
                 Start Broadcasting
             </button>
-            <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>
+            <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>
                 End Trip
             </button>
         </div>
-        <p id="user-id" class="text-xs text-gray-500 mt-6"></p>
+        <div class="mt-6 text-xs text-gray-500">
+            <p>Auth Status: <span id="auth-status" class="font-mono">Pending...</span></p>
+            <p>UID: <span id="user-id" class="font-mono">N/A</span></p>
+        </div>
     </div>
 
     <script type="module">
-        // Import necessary functions from the Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- STEP 1: PASTE YOUR FIREBASE CONFIGURATION HERE ---
         const firebaseConfig = {
-            // PASTE YOUR COPIED CONFIG OBJECT HERE
+            // --- PASTE YOUR FIREBASE CONFIG FROM YOUR NEW PROJECT HERE ---
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
             projectId: "YOUR_PROJECT_ID",
@@ -49,50 +48,56 @@
             appId: "YOUR_APP_ID"
         };
 
-        // --- UI ELEMENTS ---
         const statusText = document.getElementById('status-text');
         const startBtn = document.getElementById('start-btn');
         const endBtn = document.getElementById('end-btn');
+        const authStatusText = document.getElementById('auth-status');
         const userIdText = document.getElementById('user-id');
         
-        // --- APP LOGIC ---
         let db, auth;
         let watchId = null;
-        const busId = "BUS-42"; // The ID for this specific bus
+        const busId = "BUS-42";
 
-        // --- STEP 2: INITIALIZE FIREBASE & AUTHENTICATE ---
+        function updateStatus(message, colorClass) {
+            statusText.textContent = message;
+            statusText.className = `text-xl font-bold ${colorClass}`;
+        }
+        
+        console.log("DEBUG: Script loaded. Initializing Firebase...");
         try {
             const app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
             
+            updateStatus('Authenticating...', 'text-yellow-400');
+            authStatusText.textContent = "Connecting...";
+
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    // User is signed in anonymously.
-                    console.log("Authenticated anonymously. User ID:", user.uid);
-                    userIdText.textContent = `UID: ${user.uid}`;
+                    console.log("DEBUG: Auth state changed. User is signed in.", user);
+                    authStatusText.textContent = "Success";
+                    userIdText.textContent = user.uid;
                     updateStatus('Ready to Start', 'text-white');
                     startBtn.disabled = false;
                 } else {
-                    // User is signed out.
-                    console.log("User is not authenticated. Signing in...");
-                    updateStatus('Authenticating...', 'text-yellow-400');
+                    console.log("DEBUG: Auth state changed. User is not signed in. Attempting anonymous sign-in.");
+                    authStatusText.textContent = "Signing In...";
                     signInAnonymously(auth).catch((error) => {
-                        console.error("Anonymous sign-in failed:", error);
+                        console.error("CRITICAL: Anonymous sign-in failed!", error);
+                        authStatusText.textContent = "Failed!";
                         updateStatus('Authentication Failed', 'text-red-500');
                     });
                 }
             });
 
         } catch (e) {
-            console.error("Firebase initialization failed:", e);
+            console.error("CRITICAL: Firebase initialization failed!", e);
             updateStatus('Firebase Init Failed', 'text-red-500');
         }
 
-        // --- STEP 3: HANDLE LOCATION & FIRESTORE ---
         async function updateLocationInFirestore(position) {
             const { latitude, longitude } = position.coords;
-            console.log(`Location update: ${latitude}, ${longitude}`);
+            console.log(`DEBUG: Geolocation success. Lat: ${latitude}, Lng: ${longitude}`);
             updateStatus('Broadcasting...', 'text-green-400');
             
             try {
@@ -103,16 +108,16 @@
                     status: 'en-route',
                     lastUpdate: serverTimestamp()
                 });
-                console.log("Firestore update successful.");
+                console.log("DEBUG: Firestore write successful.");
             } catch (error) {
-                console.error("!!! Firestore Write Error: ", error);
+                console.error("CRITICAL: Firestore Write Error!", error);
                 updateStatus('Firestore Update Failed', 'text-red-500');
-                stopTracking(); // Stop if we can't write to DB
+                stopTracking();
             }
         }
         
         function handleLocationError(error) {
-            console.error("Geolocation Error:", error.message);
+            console.error("CRITICAL: Geolocation Error!", error);
             updateStatus(`Location Error`, 'text-red-500');
             stopTracking();
         }
@@ -124,15 +129,14 @@
             }
             startBtn.disabled = false;
             endBtn.disabled = true;
-            console.log("Location tracking stopped.");
         }
 
         startBtn.addEventListener('click', () => {
+            console.log("DEBUG: Start button clicked.");
             if (!navigator.geolocation) {
-                updateStatus('Geolocation not supported', 'text-red-500');
-                return;
+                return updateStatus('Geolocation not supported', 'text-red-500');
             }
-            const geoOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+            const geoOptions = { enableHighAccuracy: true };
             watchId = navigator.geolocation.watchPosition(updateLocationInFirestore, handleLocationError, geoOptions);
             updateStatus('Acquiring Location...', 'text-yellow-400');
             startBtn.disabled = true;
@@ -143,17 +147,11 @@
             stopTracking();
             updateStatus('Trip Ended', 'text-white');
             try {
-                const busRef = doc(db, "buses", busId);
-                await setDoc(busRef, { status: 'offline', lastUpdate: serverTimestamp() }, { merge: true });
+                await setDoc(doc(db, "buses", busId), { status: 'offline' }, { merge: true });
             } catch (error) {
-                console.error("Error setting status to offline: ", error);
+                console.error("DEBUG: Error ending trip.", error);
             }
         });
-
-        function updateStatus(message, colorClass) {
-            statusText.textContent = message;
-            statusText.className = `text-xl font-bold ${colorClass}`;
-        }
     </script>
 </body>
 </html>
