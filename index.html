@@ -3,64 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Driver Location App</title>
+    <title>Driver GPS Broadcaster</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
+    <style> body { font-family: 'Inter', sans-serif; } </style>
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+<body class="bg-gray-800 text-white flex items-center justify-center min-h-screen">
 
-    <div class="w-full max-w-sm bg-gray-800 rounded-2xl shadow-2xl p-8 text-center border-t-4 border-yellow-400">
-        <h1 class="text-3xl font-bold text-white mb-2">Driver's App</h1>
-        <p class="text-gray-400 mb-6">Bus ID: RJ-14-SKL</p>
+    <div class="w-full max-w-sm bg-gray-900 rounded-2xl shadow-xl p-8 text-center">
+        <h1 class="text-3xl font-bold text-yellow-400 mb-2">Driver's App</h1>
+        <p class="text-gray-400 mb-6">Bus ID: BUS-42</p>
         
-        <div class="bg-gray-700 rounded-lg p-4 mb-8">
-            <p class="text-sm font-semibold text-gray-300 uppercase tracking-wider">Status</p>
-            <p id="status-text" class="text-2xl font-bold text-yellow-400 mt-1">Initializing...</p>
+        <div class="bg-gray-700 rounded-lg p-4 mb-6">
+            <p class="text-sm font-semibold text-gray-300">STATUS</p>
+            <p id="status-text" class="text-xl font-bold">Initializing...</p>
         </div>
 
         <div class="space-y-4">
-            <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-xl text-lg transition transform hover:scale-105 disabled:bg-gray-600 disabled:cursor-not-allowed">
-                Start Trip
+            <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed">
+                Start Broadcasting
             </button>
-            <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-xl text-lg transition transform hover:scale-105 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>
+            <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>
                 End Trip
             </button>
         </div>
-        <p id="auth-status" class="text-xs text-gray-500 mt-6 font-mono"></p>
+        <div class="mt-6 text-xs text-gray-500">
+            <p>Auth Status: <span id="auth-status" class="font-mono">Pending...</span></p>
+            <p>UID: <span id="user-id" class="font-mono">N/A</span></p>
+        </div>
     </div>
 
     <script type="module">
-        // Import necessary functions from the Firebase SDK
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Your provided Firebase configuration
+        // Firebase configuration for your project
         const firebaseConfig = {
-            apiKey: "AIzaSyCWQ0Wjwtf7id-Rj8RLncuT6I4NfH-bv7o",
-            authDomain: "school-bus-44c3e.firebaseapp.com",
-            projectId: "school-bus-44c3e",
-            storageBucket: "school-bus-44c3e.appspot.com", // Corrected storage bucket
-            messagingSenderId: "594167072045",
-            appId: "1:594167072045:web:4ffaab016592e6c05a3fa4",
-            measurementId: "G-47YCVG2XPV"
+            apiKey: "AIzaSyAySXFbhyajAE7qcSyjGRcbF8jejG2GAFw",
+            authDomain: "appify-3b358.firebaseapp.com",
+            projectId: "appify-3b358",
+            storageBucket: "appify-3b358.appspot.com",
+            messagingSenderId: "1040554600495",
+            appId: "1:1040554600495:web:71afd390d47d562a333eda",
+            measurementId: "G-4WH3BW00XN"
         };
 
         const statusText = document.getElementById('status-text');
         const startBtn = document.getElementById('start-btn');
         const endBtn = document.getElementById('end-btn');
         const authStatusText = document.getElementById('auth-status');
+        const userIdText = document.getElementById('user-id');
         
         let db, auth;
         let watchId = null;
-        const busId = "RJ-14-SKL"; 
+        const busId = "BUS-42"; // This ID must match in the tracker app
 
-        function updateStatus(message, colorClass = 'text-yellow-400') {
+        function updateStatus(message, colorClass) {
             statusText.textContent = message;
-            statusText.className = `text-2xl font-bold mt-1 ${colorClass}`;
+            statusText.className = `text-xl font-bold ${colorClass}`;
         }
         
         try {
@@ -68,27 +69,28 @@
             auth = getAuth(app);
             db = getFirestore(app);
             
-            updateStatus('Authenticating...');
-            authStatusText.textContent = "Connecting to Firebase...";
+            updateStatus('Authenticating...', 'text-yellow-400');
+            authStatusText.textContent = "Connecting...";
 
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    console.log("Authenticated successfully. UID:", user.uid);
-                    authStatusText.textContent = `UID: ${user.uid.substring(0, 10)}...`;
-                    updateStatus('Ready', 'text-white');
+                    authStatusText.textContent = "Success";
+                    userIdText.textContent = user.uid;
+                    updateStatus('Ready to Start', 'text-white');
                     startBtn.disabled = false;
                 } else {
+                    authStatusText.textContent = "Signing In...";
                     signInAnonymously(auth).catch((error) => {
-                        console.error("Anonymous sign-in failed:", error);
-                        authStatusText.textContent = "Auth Failed!";
-                        updateStatus('Auth Failed', 'text-red-500');
+                        console.error("Anonymous sign-in failed!", error);
+                        authStatusText.textContent = "Failed!";
+                        updateStatus('Authentication Failed', 'text-red-500');
                     });
                 }
             });
 
         } catch (e) {
-            console.error("Firebase initialization failed:", e);
-            updateStatus('Firebase Error', 'text-red-500');
+            console.error("Firebase initialization failed!", e);
+            updateStatus('Firebase Init Failed', 'text-red-500');
         }
 
         async function updateLocationInFirestore(position) {
@@ -103,19 +105,16 @@
                     status: 'en-route',
                     lastUpdate: serverTimestamp()
                 });
-                console.log(`Location sent: ${latitude}, ${longitude}`);
             } catch (error) {
-                console.error("Firestore Write Error:", error);
-                updateStatus('Firestore Failed', 'text-red-500');
+                console.error("Firestore Write Error!", error);
+                updateStatus('Firestore Update Failed', 'text-red-500');
                 stopTracking();
             }
         }
         
         function handleLocationError(error) {
-            console.error("Geolocation Error:", error.message);
-            let message = 'Location Error';
-            if (error.code === 1) message = 'Permission Denied';
-            updateStatus(message, 'text-red-500');
+            console.error("Geolocation Error!", error);
+            updateStatus(`Location Error`, 'text-red-500');
             stopTracking();
         }
         
@@ -130,11 +129,12 @@
 
         startBtn.addEventListener('click', () => {
             if (!navigator.geolocation) {
-                return updateStatus('Geolocation N/A', 'text-red-500');
+                return updateStatus('Geolocation not supported', 'text-red-500');
             }
-            const geoOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+            // Request location permission and start watching
+            const geoOptions = { enableHighAccuracy: true };
             watchId = navigator.geolocation.watchPosition(updateLocationInFirestore, handleLocationError, geoOptions);
-            updateStatus('Getting Location...', 'text-yellow-400');
+            updateStatus('Acquiring Location...', 'text-yellow-400');
             startBtn.disabled = true;
             endBtn.disabled = false;
         });
@@ -143,12 +143,12 @@
             stopTracking();
             updateStatus('Trip Ended', 'text-white');
             try {
-                await setDoc(doc(db, "buses", busId), { status: 'offline', lastUpdate: serverTimestamp() }, { merge: true });
+                // Update the status to 'offline'
+                await setDoc(doc(db, "buses", busId), { status: 'offline' }, { merge: true });
             } catch (error) {
-                console.error("Error ending trip:", error);
+                console.error("Error ending trip.", error);
             }
         });
     </script>
 </body>
 </html>
-
