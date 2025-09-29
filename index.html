@@ -37,9 +37,20 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Hardcoded Firebase configuration from your original file
+        const firebaseConfig = {
+            apiKey: "AIzaSyAySXFbhyajAE7qcSyjGRcbF8jejG2GAFw",
+            authDomain: "appify-3b358.firebaseapp.com",
+            projectId: "appify-3b358",
+            storageBucket: "appify-3b358.appspot.com",
+            messagingSenderId: "1040554600495",
+            appId: "1:1040554600495:web:71afd390d47d562a333eda",
+            measurementId: "G-4WH3BW00XN"
+        };
+        
         // --- Global Variables ---
         const busId = "BUS-42";
         let db;
@@ -56,23 +67,16 @@
         // --- App Initialization ---
         async function initializeDriverApp() {
             try {
-                // Use environment variables for Firebase config for security
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-                if (!firebaseConfig) {
-                    throw new Error("Firebase configuration is missing.");
+                if (!firebaseConfig.apiKey) {
+                    throw new Error("Firebase configuration is missing or incomplete.");
                 }
 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 const auth = getAuth(app);
-
-                if (typeof __initial_auth_token !== 'undefined') {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
                 
-                console.log("Firebase Authenticated.");
+                console.log("Firebase Authenticated Anonymously.");
                 ui.status.textContent = "Ready";
                 ui.startBtn.disabled = false;
             } catch (error) {
@@ -111,7 +115,6 @@
             ui.startBtn.disabled = false;
             ui.endBtn.disabled = true;
             try {
-                // Set status to offline, merging to avoid deleting other potential fields
                 await setDoc(doc(db, "buses", busId), { status: 'offline', lastUpdate: serverTimestamp() }, { merge: true });
             } catch (error) {
                 console.error("Error ending trip:", error);
@@ -129,7 +132,7 @@
                     lng: longitude,
                     status: 'en-route',
                     lastUpdate: serverTimestamp()
-                }, { merge: true }); // Use merge to be safe
+                }, { merge: true });
                 console.log("Location updated:", { latitude, longitude });
             } catch (error) {
                 console.error("Firestore Write Error:", error);
@@ -143,9 +146,9 @@
             showError(`Geolocation Error: ${error.message}`);
         }
 
-        // --- Initialize the app on DOM content loaded ---
         document.addEventListener('DOMContentLoaded', initializeDriverApp);
     </script>
 </body>
 </html>
+
 
