@@ -8,101 +8,120 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
+        .transition-all { transition: all 0.3s ease-in-out; }
     </style>
 </head>
 <body class="bg-gray-100">
 
     <!-- Driver View -->
-    <div id="driver-view" class="bg-gray-800 text-white flex items-center justify-center min-h-screen">
-        <div class="w-full max-w-sm bg-gray-900 rounded-2xl shadow-xl p-8 text-center">
+    <div id="driver-view" class="bg-gray-800 text-white flex items-center justify-center min-h-screen p-4">
+        <div class="w-full max-w-sm bg-gray-900 rounded-2xl shadow-xl p-6 sm:p-8 text-center">
             <h1 class="text-3xl font-bold text-yellow-400 mb-2">Driver Mode</h1>
-            <p class="text-gray-400 mb-6">Bus ID: BUS-42</p>
-            <div class="bg-gray-700 rounded-lg p-4 mb-6">
-                <p class="text-sm font-semibold text-gray-300">STATUS</p>
-                <p id="driver-status" class="text-xl font-bold text-gray-300">Ready</p>
+            <p class="text-gray-400 mb-6">Bus ID: <span class="font-medium">BUS-42</span></p>
+            
+            <div id="error-message" class="hidden bg-red-900 border border-red-600 text-red-300 px-4 py-2 rounded-lg mb-4 text-sm">
+                <!-- Error content will be inserted here -->
             </div>
+
+            <div class="bg-gray-700 rounded-lg p-4 mb-6">
+                <p class="text-sm font-semibold text-gray-300 uppercase tracking-wider">Status</p>
+                <p id="driver-status" class="text-xl font-bold text-white transition-all">Initializing...</p>
+            </div>
+
             <div class="space-y-4">
-                <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500">Start Broadcasting</button>
-                <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-500" disabled>End Trip</button>
+                <button id="start-btn" class="w-full bg-green-600 hover:bg-green-700 font-bold py-3 px-6 rounded-lg transition-all disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>Start Broadcasting</button>
+                <button id="end-btn" class="w-full bg-red-600 hover:bg-red-700 font-bold py-3 px-6 rounded-lg transition-all disabled:bg-gray-500 disabled:cursor-not-allowed" disabled>End Trip</button>
             </div>
         </div>
     </div>
 
     <script type="module">
-        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // ============== PASTE YOUR FIREBASE CONFIG HERE ==============
-        const firebaseConfig = {
-            apiKey: "AIzaSyAySXFbhyajAE7qcSyjGRcbF8jejG2GAFw",
-            authDomain: "appify-3b358.firebaseapp.com",
-            projectId: "appify-3b358",
-            storageBucket: "appify-3b358.appspot.com",
-            messagingSenderId: "1040554600495",
-            appId: "1:1040554600495:web:71afd390d47d562a333eda",
-            measurementId: "G-4WH3BW00XN"
-        };
-        // =============================================================
 
         // --- Global Variables ---
         const busId = "BUS-42";
-        let db, auth;
+        let db;
         let watchId = null;
 
         // --- UI Elements ---
-        const driverStatus = document.getElementById('driver-status');
-        const startBtn = document.getElementById('start-btn');
-        const endBtn = document.getElementById('end-btn');
-        
+        const ui = {
+            status: document.getElementById('driver-status'),
+            startBtn: document.getElementById('start-btn'),
+            endBtn: document.getElementById('end-btn'),
+            errorMessage: document.getElementById('error-message'),
+        };
+
         // --- App Initialization ---
         async function initializeDriverApp() {
             try {
+                // Use environment variables for Firebase config for security
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                if (!firebaseConfig) {
+                    throw new Error("Firebase configuration is missing.");
+                }
+
                 const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
                 db = getFirestore(app);
-                await signInAnonymously(auth);
-                console.log("Firebase Authenticated Anonymously.");
-                startBtn.disabled = false; // Enable button after successful init
+                const auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                console.log("Firebase Authenticated.");
+                ui.status.textContent = "Ready";
+                ui.startBtn.disabled = false;
             } catch (error) {
                 console.error("CRITICAL: Firebase Init or Auth Failed!", error);
-                driverStatus.textContent = "Connection Failed";
-                alert("Could not connect to the service. Please check the console for errors.");
+                showError(`Connection Failed: ${error.message}`);
             }
         }
 
+        function showError(message) {
+            ui.status.textContent = "Connection Failed";
+            ui.errorMessage.textContent = message;
+            ui.errorMessage.classList.remove('hidden');
+            ui.startBtn.disabled = true;
+            ui.endBtn.disabled = true;
+        }
+
         // --- Driver Logic ---
-        startBtn.addEventListener('click', () => {
+        ui.startBtn.addEventListener('click', () => {
             if (!navigator.geolocation) {
-                driverStatus.textContent = 'Geolocation not supported';
+                showError('Geolocation is not supported by your browser.');
                 return;
             }
-            const options = { enableHighAccuracy: true };
+            const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
             watchId = navigator.geolocation.watchPosition(updateLocationInFirestore, handleLocationError, options);
-            driverStatus.textContent = 'Acquiring Location...';
-            startBtn.disabled = true;
-            endBtn.disabled = false;
+            ui.status.textContent = 'Acquiring Location...';
+            ui.startBtn.disabled = true;
+            ui.endBtn.disabled = false;
         });
 
-        endBtn.addEventListener('click', async () => {
+        ui.endBtn.addEventListener('click', async () => {
             if (watchId !== null) {
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
             }
-            driverStatus.textContent = 'Trip Ended';
-            startBtn.disabled = false;
-            endBtn.disabled = true;
+            ui.status.textContent = 'Trip Ended';
+            ui.startBtn.disabled = false;
+            ui.endBtn.disabled = true;
             try {
-                await setDoc(doc(db, "buses", busId), { status: 'offline' }, { merge: true });
+                // Set status to offline, merging to avoid deleting other potential fields
+                await setDoc(doc(db, "buses", busId), { status: 'offline', lastUpdate: serverTimestamp() }, { merge: true });
             } catch (error) {
                 console.error("Error ending trip:", error);
+                showError("Could not update status to offline.");
             }
         });
 
         async function updateLocationInFirestore(position) {
             const { latitude, longitude } = position.coords;
-            driverStatus.textContent = 'Broadcasting...';
+            ui.status.textContent = 'Broadcasting Live...';
             try {
                 const busRef = doc(db, "buses", busId);
                 await setDoc(busRef, {
@@ -110,21 +129,23 @@
                     lng: longitude,
                     status: 'en-route',
                     lastUpdate: serverTimestamp()
-                });
+                }, { merge: true }); // Use merge to be safe
                 console.log("Location updated:", { latitude, longitude });
             } catch (error) {
                 console.error("Firestore Write Error:", error);
-                driverStatus.textContent = 'Firestore Update Failed';
+                ui.status.textContent = 'Update Failed';
             }
         }
 
         function handleLocationError(error) {
             console.error("Geolocation Error:", error.message);
-            driverStatus.textContent = 'Location Error';
+            ui.status.textContent = 'Location Error';
+            showError(`Geolocation Error: ${error.message}`);
         }
 
-        // --- Initialize the app ---
-        initializeDriverApp();
+        // --- Initialize the app on DOM content loaded ---
+        document.addEventListener('DOMContentLoaded', initializeDriverApp);
     </script>
 </body>
 </html>
+
